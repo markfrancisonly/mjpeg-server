@@ -1,0 +1,15 @@
+services:
+  mjpeg-server:
+    container_name: mjpeg-server
+    restart: always
+    build: 
+      context: .
+
+    volumes:
+      - ./config.example.yaml:/mjpeg-server/config.yaml
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+
+    ports:
+      - "8080:8080"
+ 

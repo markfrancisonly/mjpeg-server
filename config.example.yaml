@@ -1,0 +1,18 @@
+server:
+  ignore_certificate_errors: false
+  stream_fps: 30
+  fetch_minimum_fps: 1
+  fetch_maximum_fps: 15
+  image_timeout_behavior: disconnect 
+  image_timeout_seconds: 30
+  image_validation: valid_jpeg 
+  
+images:
+  wallpanel:
+    url: http://fully-kiosk:2323/?cmd=getCamshot&password=secret
+    fetch_maximum_fps: 30
+    image_timeout_seconds: 5
+  traffic-cam:
+    url: https://511ga.org/map/Cctv/14408
+    fetch_minimum_fps: .1
+    fetch_maximum_fps: 1
