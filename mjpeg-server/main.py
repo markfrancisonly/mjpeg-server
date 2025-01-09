@@ -592,7 +592,6 @@ async def assert_valid_image_data(image_data: bytes, validation_method: str) -> 
 
         case "valid_jpeg":
             try:
-
                 def validate_jpeg(data):
                     image = Image.open(BytesIO(data))
                     image.verify()
@@ -608,27 +607,27 @@ async def assert_valid_image_data(image_data: bytes, validation_method: str) -> 
 
         case "conversion":
             try:
+                def convert_to_yuv420(data: bytes) -> bytes:
+                    with Image.open(BytesIO(data)) as img:
+                        # Convert image to YCbCr (equivalent to YUV)
+                        ycbcr_img = img.convert("YCbCr")
+                        
+                        # Save the image to a BytesIO buffer with JPEG format and 4:2:0 subsampling
+                        output_io = BytesIO()
+                        ycbcr_img.save(output_io, format="JPEG", subsampling=2, quality=95)
+                        converted_data = output_io.getvalue()
+                        if not converted_data:
+                            raise ValueError("Converted image is empty.")
+                        return converted_data
 
-                def convert_image(data):
-                    image = Image.open(BytesIO(data))
-                    # Convert image to RGB if it's not in a compatible mode
-                    if image.mode in ("RGBA", "P"):
-                        image = image.convert("RGB")
-                    output_io = BytesIO()
-                    image.save(
-                        output_io, format="JPEG", quality=95
-                    )  # Adjust quality as needed
-                    converted_data = output_io.getvalue()
-                    if not converted_data:
-                        raise ValueError("Converted image is empty.")
-                    return converted_data
+                # Run the conversion in a separate thread
+                converted_image_data = await asyncio.to_thread(convert_to_yuv420, image_data)
+                logger.info("Image successfully converted to YUV 4:2:0 format.")
+                return converted_image_data
 
-                # Run synchronous conversion in a separate thread
-                converted_data = await asyncio.to_thread(convert_image, image_data)
-                return converted_data
             except Exception as e:
-                raise ValueError(f"Image conversion failed: {e}")
-
+                raise ValueError(f"Failed to convert image to YUV 4:2:0: {e}")
+    
         case _:
             raise ValueError(f"Unknown validation method '{validation_method}'")
 
@@ -1021,49 +1020,84 @@ async def health_check():
 
 # ---------------- Startup and Shutdown Event Handlers ---------------- #
 
-
-async def load_stale_image_from_file_system(image_id, stream_config):
+async def load_stale_image_from_file_system(
+    image_id: str,
+    image_stale_image_path: str = None,
+    default_fallback_image_data: bytes = b""
+) -> bytes:
     """
-    Asynchronously load the offline image for a given image_id.
-    Protects shared access using per-image lock.
+    Asynchronously load and convert the offline (stale) image for a given image_id to YUV 4:2:0.
+
+    The function prioritizes the image-specific stale_image_path. If it's not provided
+    or fails to load, it falls back to the server-level stale_image_path. If both
+    paths are unavailable or loading fails, it uses the predefined default fallback image data.
+
+    After loading, the image is converted to YUV 4:2:0 chroma subsampling.
 
     Args:
-        image_id (str): The key identifying the image.
-        stream_config (dict): Configuration dictionary for the image.
+        image_id (str): Identifier for the image.
+        image_stale_image_path (str, optional): Path to the image-specific stale image.
+            Defaults to None.
+        default_fallback_image_data (bytes, optional): Predefined fallback image data.
+            Defaults to empty bytes.
 
     Returns:
-        bytes: The offline image data.
+        bytes: The converted stale image data in YUV 4:2:0 format.
     """
-    server_fallback_frame_image_path = config["server"].get("stale_image_path", None)
-    image_fallback_frame_image_path = stream_config.get(
-        "stale_image_path", server_fallback_frame_image_path
-    )
-    stale_image_data = None
-    if image_fallback_frame_image_path:
+    # Determine the fallback path: image-specific > server-level
+    fallback_path = image_stale_image_path 
+
+    if fallback_path:
+        logger.debug(
+            f"Image '{image_id}': Attempting to load stale image from '{fallback_path}'."
+        )
         try:
-            # Use asynchronous file I/O to prevent blocking the event loop
-            async with aiofiles.open(image_fallback_frame_image_path, "rb") as f:
+            async with aiofiles.open(fallback_path, "rb") as f:
                 stale_image_data = await f.read()
                 if not stale_image_data:
                     raise ValueError("Offline image file is empty.")
             logger.info(
-                f"Offline image loaded for '{image_id}' from '{image_fallback_frame_image_path}'."
+                f"Image '{image_id}': Successfully loaded stale image from '{fallback_path}'."
             )
         except Exception as e:
-            # Log errors if the offline image fails to load
             logger.error(
-                f"Failed to load offline image for '{image_id}' from '{image_fallback_frame_image_path}': {e}"
+                f"Image '{image_id}': Failed to load stale image from '{fallback_path}': {e}"
             )
-    if not stale_image_data:
-        # Use the server's default stale_image_data or fallback to predefined data
-        stale_image_data = config["server"].get(
-            "stale_image_data", DEFAULT_FALLBACK_IMAGE_DATA
+            stale_image_data = None
+    else:
+        stale_image_data = None
+
+    # Use default fallback image data if loading from file fails or paths are not provided
+    if not stale_image_data and default_fallback_image_data:
+        logger.info(
+            f"Image '{image_id}': Using predefined fallback offline image."
         )
-        if stale_image_data == DEFAULT_FALLBACK_IMAGE_DATA:
-            logger.info(f"Using fallback offline image for '{image_id}'.")
-        else:
-            logger.info(f"Using server's stale_image_data for '{image_id}'.")
-    return stale_image_data
+        stale_image_data = default_fallback_image_data
+
+    # If no fallback is available, log a critical error and return empty bytes
+    if not stale_image_data:
+        logger.critical(
+            f"Image '{image_id}': No valid stale image available. Returning empty bytes."
+        )
+        return b""
+
+    try:
+        # Convert the loaded image data to YUV 4:2:0
+        validated_data = await assert_valid_image_data(
+            stale_image_data, "conversion"
+        )
+
+        logger.info(
+            f"Image '{image_id}': Successfully converted stale image to YUV 4:2:0."
+        )
+        return validated_data
+
+    except Exception as e:
+        logger.error(
+            f"Image '{image_id}': Failed to convert stale image to YUV 4:2:0: {e}"
+        )
+        # As a fallback, return the original stale_image_data
+        return stale_image_data
 
 
 async def startup_event_handler():
@@ -1136,22 +1170,7 @@ async def startup_event_handler():
     )
 
     # Load the default offline image if a path is specified
-    stale_image_path = server_config.get("stale_image_path", None)
-    if stale_image_path:
-        try:
-            async with aiofiles.open(stale_image_path, "rb") as f:
-                default_stale_image_data = await f.read()
-                if not default_stale_image_data:
-                    raise ValueError("Offline image file is empty.")
-            logger.info(f"Offline image loaded from '{stale_image_path}'.")
-        except Exception as e:
-            # Log errors if the default offline image fails to load
-            logger.error(
-                f"Failed to load default offline image from '{stale_image_path}': {e}"
-            )
-            default_stale_image_data = None
-    else:
-        default_stale_image_data = None
+    default_stale_image_path = server_config.get("stale_image_path", None)
 
     # Start image polling tasks for each configured image
     await start_image_polling_tasks(
@@ -1162,7 +1181,7 @@ async def startup_event_handler():
         default_image_timeout_behavior=default_image_timeout_behavior,
         default_image_validation=default_image_validation,
         default_ignore_certificate_errors=default_ignore_certificate_errors,
-        default_stale_image_data=default_stale_image_data,
+        default_stale_image_path=default_stale_image_path,
         default_fetch_agent_string=default_fetch_agent_string,  # Pass server-level fetch agent string
     )
 
@@ -1175,7 +1194,7 @@ async def start_image_polling_tasks(
     default_image_timeout_behavior: str,
     default_image_validation: str,
     default_ignore_certificate_errors: bool,
-    default_stale_image_data: bytes,
+    default_stale_image_path: str,
     default_fetch_agent_string: str,  # Added parameter for server-level fetch agent string
 ):
     """Start polling tasks for each image."""
@@ -1246,7 +1265,7 @@ async def start_image_polling_tasks(
                 "image_timeout_behavior": image_config_raw.get(
                     "image_timeout_behavior", default_image_timeout_behavior
                 ),
-                "stale_image_path": image_config_raw.get("stale_image_path", None),
+                "stale_image_path": image_config_raw.get("stale_image_path", default_stale_image_path),
                 "image_validation": image_config_raw.get(
                     "image_validation", default_image_validation
                 ),
@@ -1291,24 +1310,11 @@ async def start_image_polling_tasks(
                 image_config["auth_type"] = None
 
             # Load offline image data based on the configuration
-            if image_config["stale_image_path"]:
-                # If a stale_image_path is specified, load the image from that path
-                stale_image_data = await load_stale_image_from_file_system(
-                    sanitized_image_id, image_config
-                )
-            else:
-                # Otherwise, use the server's default stale_image_data or fallback
-                stale_image_data = (
-                    default_stale_image_data
-                    if default_stale_image_data
-                    else DEFAULT_FALLBACK_IMAGE_DATA
-                )
-                if stale_image_data == DEFAULT_FALLBACK_IMAGE_DATA:
-                    logger.info(f"Using fallback image for '{sanitized_image_id}'.")
-                else:
-                    logger.info(
-                        f"Using server's stale_image_data for '{sanitized_image_id}'."
-                    )
+            stale_image_data = await load_stale_image_from_file_system (
+                    image_id=sanitized_image_id,
+                    image_stale_image_path=image_config.get("stale_image_path"),
+                    default_fallback_image_data=DEFAULT_FALLBACK_IMAGE_DATA
+            )
 
             image_config["stale_image_data"] = (
                 stale_image_data  # Assign the loaded stale image data
