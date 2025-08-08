@@ -4,6 +4,6 @@ aiohttp>=3.8.5
 aiofiles>=23.1.0
 PyYAML>=6.0.1
 Pillow>=10.0.1
-uvloop>=0.21.0
+uvloop>=0.21.0; sys_platform != 'win32'
 httpx>=0.24.0
 yarl>=1.9.2

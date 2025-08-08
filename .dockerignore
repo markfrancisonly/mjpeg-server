@@ -1,0 +1,7 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.log
+config.example.yaml
+compose.yaml
