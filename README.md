@@ -1,61 +1,68 @@
 
-# FastAPI Image Streaming Server
+# MJPEG Server 
 
-This repository contains a FastAPI-based server for efficient image fetching, validation, and streaming in both static image format and MJPEG streams.
+FastAPI-based server for fetching and streaming static images as a reliable MJPEG stream, intended to be run in a docker container. May be used to provide a stable mjpeg stream for transcoding into a RTSP feed using [go2rtc](https://github.com/AlexxIT/go2rtc).
 
 ## Features
 
-- **Image Streaming**: Serve static images and MJPEG streams.
-- **Asynchronous Fetching**: Efficient image fetching with configurable FPS rates.
-- **Validation**: Validate and convert images to ensure compatibility.
-- **Logging**: Custom logging configuration for detailed debugging.
-- **Health Check**: Endpoints to monitor the health and status of image streams.
+- Efficient and high performance web server
+- Protects source image from being overloaded
+- Fetch and stream FPS are individually adjustable
+- Provides image validation, conversion, and fallback image behaviors
 
-## Prerequisites
+### Server config example
+```yaml
+server:
+  ignore_certificate_errors: true
+  stream_fps: 15
+  fetch_minimum_fps: 1
+  fetch_maximum_fps: 5
+  image_timeout_behavior: stale_image # disconnect, stale_image, or last_frame
+  image_timeout_seconds: 30
+  image_validation: valid_jpeg # valid_jpeg, conversion, zero_bytes, none
+  stale_image_path: images/white_square.jpg
 
-- Python 3.9+
-- `pip` package manager
+images:
+  fully_desk_tablet:
+    url: http://fully_desk_tablet:2323/?cmd=getCamshot&password=secret
+    image_timeout_seconds: 5
+   
+```
+### Docker compose
 
-## Installation
+```yaml
+services:
+  mjpeg-server:
+    user: 1000:1000
+    container_name: mjpeg-server
+    restart: always
+    build: ./mjpeg-server/
+    image: mjpeg-server:latest
 
-1. Clone this repository:
+    volumes:
+      - ./config.yaml:/mjpeg-server/config.yaml
+      - ./images/:/mjpeg-server/images/
+      
+    ports:
+       - "8080:8080"
 
-   ```bash
-   git clone https://github.com/markfrancisonly/mjpeg-server.git
-   cd fastapi-image-server
-   ```
+```
 
-2. Install the required dependencies:
+### RTSP stream using Go2rtc
+```yaml
+go2rtc:
+  ffmpeg:
+    mjpeg: -f mjpeg -use_wallclock_as_timestamps 1 -fflags nobuffer -flags low_delay -i {input}
+   streams:
+    fully_desk_tablet:
+      - ffmpeg:http://10.1.1.22:8080/images/fully_desk_tablet/stream#input=mjpeg#video=h264
+  api:
+    listen: :1984
+    origin: '*'
+  rtsp:
+    listen: :8554 
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-1. Create a `config.yaml` file for server and image configurations.
-
-2. Start the server:
-
-   ```bash
-   python main.py
-   ```
-
-3. Access endpoints:
-   - Static image: `/images/{image_id}`
-   - MJPEG stream: `/images/{image_id}/stream`
-   - List all images: `/images`
-   - Health check: `/health`
-
-## Configuration
-
-The server uses a `config.yaml` file for defining the following:
-
-- **Server settings** (e.g., timeout, FPS limits).
-- **Image-specific settings** (e.g., URLs, validation methods).
-
-Refer to the provided `config.example.yaml` for structure and examples.
-
+```
 ## Endpoints
 
 ### Static Image
@@ -85,15 +92,4 @@ Check the server's status:
 ```http
 GET /health
 ```
-
-## Deployment
-
-For production deployment, use a robust ASGI server such as `uvicorn` with multiple workers.
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4
-```
-
-## Contributing
-
-This code needs to be modularized bfore contributions would be meaningful.
+ 
