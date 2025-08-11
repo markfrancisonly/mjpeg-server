@@ -6,8 +6,8 @@ FastAPI-based server for fetching and streaming static images as a reliable MJPE
 ## Features
 
 - Efficient and high performance web server
-- Protects source image from being overloaded
-- Fetch and stream FPS are individually adjustable
+- Protects image source from being overloaded
+- Fetch and stream FPS individually adjustable
 - Provides image validation, conversion, and fallback image behaviors
 
 ### Server config example
@@ -93,4 +93,5 @@ Check the server's status:
 GET /health
 ```
  
+
 
