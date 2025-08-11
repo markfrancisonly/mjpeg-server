@@ -55,7 +55,7 @@ go2rtc:
     mjpeg: -f mjpeg -use_wallclock_as_timestamps 1 -fflags nobuffer -flags low_delay -i {input}
    streams:
     fully_desk_tablet:
-      - ffmpeg:http://10.1.1.22:8080/images/fully_desk_tablet/stream#input=mjpeg#video=h264
+      - ffmpeg:http://docker:8080/images/fully_desk_tablet/stream#input=mjpeg#video=h264
   api:
     listen: :1984
     origin: '*'
@@ -93,3 +93,4 @@ Check the server's status:
 GET /health
 ```
  
+
