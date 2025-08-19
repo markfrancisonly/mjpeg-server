@@ -12,7 +12,7 @@ FastAPI-based server for fetching and streaming static images as a reliable MJPE
 
 ### Server config example
 ```yaml
-server:
+mjpeg-server:
   ignore_certificate_errors: true
   stream_fps: 15
   fetch_minimum_fps: 1

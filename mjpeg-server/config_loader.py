@@ -65,7 +65,7 @@ async def load_stale_image_from_file_system(
                 f"Image '{image_id}': Successfully loaded stale image from '{fallback_path}'."
             )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 f"Image '{image_id}': Failed to load stale image from '{fallback_path}': {e}"
             )
             stale_image_data = None
@@ -92,7 +92,7 @@ async def load_stale_image_from_file_system(
         )
         return validated_data
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Image '{image_id}': Failed to convert stale image to YUV 4:2:0: {e}"
         )
         # As a fallback, return the original stale_image_data
@@ -108,8 +108,8 @@ async def startup_event_handler():
             content = await f.read()
         loaded_config = yaml.safe_load(content)
         if loaded_config is None:
-            loaded_config = {"server": {}, "images": {}}
-        config["server"].update(loaded_config.get("server", {}))
+            loaded_config = {"mjpeg-server": {}, "images": {}}
+        config["mjpeg-server"].update(loaded_config.get("mjpeg-server", {}))
         config["images"].update(loaded_config.get("images", {}))
         logger.info("Configuration loaded successfully from config.yaml.")
     except FileNotFoundError:
@@ -129,7 +129,7 @@ async def startup_event_handler():
         )
 
     # Extract server configurations with defaults
-    server_config = config.get("server", {})
+    server_config = config.get("mjpeg-server", {})
     default_ignore_certificate_errors = server_config.get(
         "ignore_certificate_errors", DEFAULT_IGNORE_CERTIFICATE_ERRORS
     )
@@ -353,7 +353,7 @@ async def start_image_polling_tasks(
             # Start the fetching task using ImageFetcherManager
             asyncio.create_task(fetcher_manager.fetch_frames())
 
-            logger.info(
+            logger.debug(
                 f"Started polling for '{image_config['url']}' with image_id '{sanitized_image_id}'."
             )
         except Exception as e:

@@ -73,7 +73,7 @@ async def get_image_data(
                     return (data, False)
             case _:
                 # Log a warning for unknown behaviors and default to disconnect
-                logger.warning(
+                logger.debug(
                     f"Unknown stale image behavior '{image_timeout_behavior}' for image '{image_id}'."
                 )
                 return (None, True)
@@ -172,7 +172,7 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
 
         if requested_fps and stream_fps > fetch_maximum_fps:
             # Log if the requested streaming FPS exceeds the maximum fetch FPS
-            logger.info(
+            logger.debug(
                 f"Streaming rate {stream_fps} fps exceeds maximum fetch rate {fetch_maximum_fps}."
             )
 
@@ -200,7 +200,7 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
                 stream.stream_fps for stream in image_active_streams.values()
             )
 
-        logger.info(
+        logger.debug(
             f"Client {client_id} connected to stream for '{image_id}' at {stream_fps} fps."
         )
 
@@ -226,7 +226,7 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
 
                 if should_disconnect:
                     # If behavior is to disconnect, terminate the stream
-                    logger.info(
+                    logger.debug(
                         f"Disconnecting stream for client {client_id} due to stale image."
                     )
                     break
@@ -265,7 +265,7 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
 
                 # Check if the client has disconnected to gracefully terminate the stream
                 if await request.is_disconnected():
-                    logger.info(
+                    logger.debug(
                         f"Client {client_id} disconnected from stream for '{image_id}'."
                     )
                     break
@@ -274,7 +274,7 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
                 await maintain_frame_rate(image_id, stream_fps, frame_start_time)
         except asyncio.CancelledError:
             # Handle client disconnection due to cancellation
-            logger.info(
+            logger.debug(
                 f"Client {client_id} disconnected from stream for '{image_id}'."
             )
         except Exception as e:
@@ -298,7 +298,7 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
                         None  # Set to None if no active streams remain
                     )
 
-            logger.info(f"Stream for '{image_id}' terminated for client {client_id}.")
+            logger.debug(f"Stream for '{image_id}' terminated for client {client_id}.")
 
     return StreamingResponse(
         stream_mjpeg(

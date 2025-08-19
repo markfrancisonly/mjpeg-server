@@ -1,4 +1,4 @@
-server:
+mjpeg-server:
   ignore_certificate_errors: false
   stream_fps: 30
   fetch_minimum_fps: 1

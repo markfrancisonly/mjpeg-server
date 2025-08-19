@@ -7,7 +7,7 @@ from models import Frame  # Import Frame for instantiation
 
 # Centralized configuration dictionary with default values
 config = {
-    "server": {
+    "mjpeg-server": {
         "ignore_certificate_errors": False,
         "stream_fps": 5.0,
         "fetch_minimum_fps": 1.0,
