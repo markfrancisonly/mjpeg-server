@@ -172,9 +172,8 @@ class ImageFetcherManager:
 
                 async with frame.lock:
                     frame.data = validated_data  # Update the latest image data
-                    frame.last_updated = (
-                        fetch_end_time  # Update the last updated timestamp
-                    )
+                    frame.last_updated = fetch_end_time
+                    frame.snapshot = (frame.data, frame.last_updated)
 
                     if previous_fetch_time is not None:
                         # Calculate the interval since the last successful fetch

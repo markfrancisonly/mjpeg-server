@@ -45,15 +45,14 @@ async def get_image_data(
         frame = Frame()
         frames[image_id] = frame
 
-        if data is None:
-            # Lockless snapshot read (bytes assignment is atomic; minor staleness is acceptable here)
-            data = frame.data
-            last_updated = frame.last_updated
-        else:
-            # If data is provided, use it directly (useful for streams)
-            last_updated = time.time()
+    if data is None:
+        # Lock-free, atomic snapshot read
+        data, last_updated = frame.snapshot
+    else:
+        # If data is provided, use it directly (useful for streams)
+        last_updated = time.time()
 
-    # Determine if the image data is stale based on the timeout
+            # Determine if the image data is stale based on the timeout
     offline = data is None or time.time() - last_updated > image_timeout_seconds
 
     if offline:

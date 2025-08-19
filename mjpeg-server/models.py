@@ -16,6 +16,9 @@ class Frame:
         default_factory=asyncio.Lock
     )  # Asynchronous lock for thread safety when accessing frame data
 
+    # Atomic snapshot (data, last_updated) for lock-free readers
+    snapshot: tuple[bytes, float] = field(default_factory=lambda: (b"", 0.0))
+
 
 @dataclass
 class Stream:

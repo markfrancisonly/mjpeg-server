@@ -42,7 +42,7 @@ _ENV_LEVEL = _parse_log_level(_env_level_raw, default=logging.INFO)
 
 LOGGING_CONFIG = {
     "version": 1,
-    "disable_existing_loggers": False,  # keep 3rd-party loggers unless we change them explicitly
+    "disable_existing_loggers": True,
     "formatters": {
         "default": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
     },
@@ -68,7 +68,7 @@ LOGGING_CONFIG = {
         },
         "uvicorn.access": {
             "handlers": ["default"],
-            "level": _ENV_LEVEL,
+            "level": "WARNING",
             "propagate": False,
         },
     },
