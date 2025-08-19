@@ -1,12 +1,13 @@
 import asyncio
 import time
-import httpx
+
 import aiohttp
-from yarl import URL
+import httpx
 from logging_config import logger
-from state import streams_locks, streams_peak_fps, frames
 from models import Frame
-from utils import maintain_frame_rate, assert_valid_image_data
+from state import frames, streams_locks, streams_peak_fps
+from utils import assert_valid_image_data, maintain_frame_rate
+from yarl import URL
 
 
 class ImageFetcherManager:
@@ -257,17 +258,21 @@ class ImageFetcherManager:
                     logger.error(error_msg)
                     raise ValueError(error_msg)
             elif self.auth_type:
-                # Log a warning if an unsupported auth type is specified
                 logger.warning(
                     f"Image '{self.image_id}': Unsupported auth_type '{self.auth_type}'. Skipping authentication."
                 )
-
             # Create an httpx.AsyncClient with the appropriate settings
+            limits = httpx.Limits(max_keepalive_connections=100, max_connections=200)
+            transport = httpx.AsyncHTTPTransport(
+                retries=2, verify=not self.ignore_certificate_errors, http2=True
+            )
             self.httpx_client = httpx.AsyncClient(
-                timeout=10.0,  # Set a timeout for requests
-                verify=not self.ignore_certificate_errors,  # SSL verification
-                auth=auth,  # Authentication credentials
-                headers={"User-Agent": self.fetch_agent_string},  # Set User-Agent
+                timeout=httpx.Timeout(10.0, connect=5.0, read=10.0),
+                auth=auth,
+                headers={"User-Agent": self.fetch_agent_string},
+                limits=limits,
+                transport=transport,
+                http2=True,
             )
         return self.httpx_client
 
@@ -278,17 +283,21 @@ class ImageFetcherManager:
         Returns:
             aiohttp.ClientSession: The aiohttp session instance.
         """
+
         if not self.aiohttp_session:
             # Create a TCPConnector with SSL settings and connection limits
             connector = aiohttp.TCPConnector(
-                ssl=not self.ignore_certificate_errors, limit_per_host=10
+                ssl=not self.ignore_certificate_errors,
+                limit_per_host=50,
+                ttl_dns_cache=300,
             )
 
             # Initialize the aiohttp.ClientSession with the connector and headers
             self.aiohttp_session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=10),
+                timeout=aiohttp.ClientTimeout(total=10, connect=5, sock_read=10),
                 connector=connector,
                 headers={"User-Agent": self.fetch_agent_string},
+                trust_env=True,
             )
         return self.aiohttp_session
 

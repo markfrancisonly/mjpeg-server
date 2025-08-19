@@ -1,14 +1,15 @@
-import platform
 import asyncio
+import platform
+
 try:
-    import uvloop # pyright: ignore[reportMissingImports]
+    import uvloop  # pyright: ignore[reportMissingImports]
 except ImportError:
     uvloop = None
 import uvicorn
 from app import app
 
 # Set uvloop as the default event loop policy for improved performance on Unix systems
-if platform.system() != "Windows":
+if platform.system() != "Windows" and uvloop is not None:
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 if __name__ == "__main__":

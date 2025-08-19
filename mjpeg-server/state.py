@@ -1,6 +1,7 @@
-from collections import deque, defaultdict
 import asyncio
 import time
+from collections import defaultdict, deque
+
 from logging_config import logger
 from models import Frame  # Import Frame for instantiation
 
@@ -36,5 +37,3 @@ streams_peak_fps = defaultdict(
 
 # Global dictionary to track ImageFetcherManager instances
 fetcher_managers = {}  # image_id: ImageFetcherManager instance
-
-

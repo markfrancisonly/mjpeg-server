@@ -1,23 +1,18 @@
 import asyncio
+
 import aiofiles
 import yaml
-from yarl import URL
+from fetcher import ImageFetcherManager
 from logging_config import logger
-from state import (
-    config,
-    images_config,
-    streams,
-    frames,
-    fetcher_managers,
-)
 from models import Frame
+from state import config, fetcher_managers, frames, images_config, streams
 from utils import (
-    validate_fps,
-    sanitize_image_id,
     DEFAULT_FALLBACK_IMAGE_DATA,
     assert_valid_image_data,
+    sanitize_image_id,
+    validate_fps,
 )
-from fetcher import ImageFetcherManager
+from yarl import URL
 
 CONFIG_FILE = "config.yaml"  # Configuration file path
 DEFAULT_IGNORE_CERTIFICATE_ERRORS = False  # Whether to ignore SSL certificate errors

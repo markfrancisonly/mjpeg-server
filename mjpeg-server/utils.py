@@ -1,11 +1,12 @@
-import time
+import asyncio
 import datetime
 import re
-import asyncio
-from io import BytesIO
-from PIL import Image
+import time
 from collections import deque
+from io import BytesIO
+
 from logging_config import logger
+from PIL import Image
 
 MAX_FPS = 240.0  # Define constants for default values
 

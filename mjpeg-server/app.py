@@ -1,19 +1,20 @@
-import time
-import json
 import asyncio
-from fastapi import FastAPI, Response, Request, HTTPException
+import json
+import time
+
+from config_loader import shutdown_event_handler, startup_event_handler
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from logging_config import logger
-from state import images_config, frames, streams, streams_locks, streams_peak_fps
+from models import Frame, Stream
+from state import frames, images_config, streams, streams_locks, streams_peak_fps
 from utils import (
+    calculate_average_fps,
+    format_time,
+    maintain_frame_rate,
     sanitize_image_id,
     validate_fps,
-    calculate_average_fps,
-    maintain_frame_rate,
-    format_time,
 )
-from models import Stream, Frame
-from config_loader import startup_event_handler, shutdown_event_handler
 
 app = FastAPI()  # Initialize the FastAPI application
 
@@ -44,10 +45,10 @@ async def get_image_data(
         frame = Frame()
         frames[image_id] = frame
 
-    async with frame.lock:
         if data is None:
-            data = frame.data  # Latest image data
-            last_updated = frame.last_updated  # Timestamp of the last update
+            # Lockless snapshot read (bytes assignment is atomic; minor staleness is acceptable here)
+            data = frame.data
+            last_updated = frame.last_updated
         else:
             # If data is provided, use it directly (useful for streams)
             last_updated = time.time()
@@ -311,6 +312,10 @@ async def serve_image_stream(request: Request, image_id: str, frame_rate: float 
             stale_image_data=image_config["stale_image_data"],
         ),
         media_type="multipart/x-mixed-replace; boundary=frame",  # MIME type for MJPEG
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
     )
 
 

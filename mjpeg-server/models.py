@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
-from collections import deque
 import asyncio
+from collections import deque
+from dataclasses import dataclass, field
 
 
 @dataclass
